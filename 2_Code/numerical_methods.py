@@ -1,208 +1,365 @@
+# numerical_methods.py - 列车动力学模拟数值计算核心模块
+# 包含龙格-库塔法、微分方程求解、末态速度计算等核心算法
+
 import numpy as np
-import matplotlib.pyplot as plt
-from scipy.integrate import solve_ivp
-
-#----------------------------------------第一张图------------------------------------
-
-# 定义微分方程
-def model(t, v, alpha, P, m, k):
-    dvdt = (P/(m*v)) - (k/m)*v**alpha
-    return dvdt
-
-# 参数设置
-P = 1000.0  # 功率
-m = 100     # 质量
-k = 50      # 阻力系数
-v0 = 1e-15  # 初始速度 (避免除以零)
-t_span = (0, 10)  # 时间范围
-t_eval = np.linspace(t_span[0], t_span[1], 1000)  # 时间点
-
-# 定义末态速度函数
-def terminal_velocity(alpha, P, k):
-    return (P/k)**(1/(alpha+1))
-
-# 计算α=0时的解
-alpha = 0
-sol = solve_ivp(model, t_span, [v0], args=(alpha, P, m, k), t_eval=t_eval, method='RK45')
-v_term = terminal_velocity(alpha, P, k)
+from scipy.optimize import fsolve
+import warnings
+warnings.filterwarnings('ignore', category=RuntimeWarning)  # 忽略数值计算警告
 
 
-
-
-#------------------------------------第二张图---------------------------------------------------------
-# 定义参数
-P = 1000  # 功率
-m = 100   # 质量
-k = 50    # 阻力系数
-
-# 计算末态速度
-v_final = np.sqrt(P / k)
-
-# 生成时间数组
-t = np.linspace(0, 15, 500)
-
-# 根据方程 v = sqrt((P/k)*(1-exp(-2*k*t/m))) 计算对应的v值
-v = np.sqrt((P / k) * (1 - np.exp(-2 * k * t / m)))
-#--------------------------------求解方程-------------------------------------------
-# 定义已知参数
-k1 = 5.90e-4  # 一次项系数，单位：kg/s
-k2 = 5.86     # 二次项系数，单位：kg/m
-P = 2e7       # 功率，单位：W
-
-# 定义平衡时的方程：k1*v^2 + k2*v^3 - P = 0
-def equation(v):
-    return k1 * v**2 + k2 * v**3 - P
-
-# 提供一个合理的初始猜测值，考虑到高速列车的速度范围
-initial_guess = 300  # 初始猜测速度为300 m/s
-
-# 使用fsolve函数求解方程
-final_velocity = fsolve(equation, initial_guess)[0]
-
-# 输出结果
-print(f"列车的末态速度为: {final_velocity:.2f} m/s")
-#---------------------------------------第三张图-------------------------------------------------------
-def model(t, v, alpha, P, m, k):
-    dvdt = (P/(m*v)) - (k/m)*v**alpha
-    return dvdt
-
-# 参数设置
-P = 1000.0  # 功率
-m = 100     # 质量
-k = 50     # 阻力系数
-v0 = 1e-15   # 初始速度 (避免除以零)
-t_span = (0, 2)  # 时间范围
-t_eval = np.linspace(t_span[0], t_span[1], 1000)  # 时间点
-
-# 定义末态速度函数
-def terminal_velocity(alpha, P, k):
-    return (P/k)**(1/(alpha+1))
-
-
-for i, alpha in enumerate(alphas_partial):
-    # 数值求解微分方程
-    sol = solve_ivp(model, t_span, [v0], args=(alpha, P, m, k), t_eval=t_eval, method='RK45')
+class ResistanceModels:
+    """阻力模型定义类，包含不同类型的阻力函数"""
     
-    # 计算末态速度
-    v_term = terminal_velocity(alpha, P, k)
-#---------------------------------第四张图--------------------------------------
-# 定义物理参数
-m = 150e3    # 列车质量，单位：kg
-P = 2e7      # 功率，单位：W
-k1 = 5.90e-4 # 一次项系数，单位：kg/s
-k2 = 5.86    # 二次项系数，单位：kg/m
-
-# 定义微分方程 (25)：du/dt = 2P/m - (2k2/m)u^(3/2) - (2k1/m)u
-def dudt(t, u, k1_val=k1):
-    # 确保u为非负值
-    u = max(u, 0)
-    return (2*P/m) - (2*k2/m)*u**(3/2) - (2*k1_val/m)*u
-
-# 定义时间范围
-t_span = (0, 3000)  # 0到3000秒
-t_eval = np.linspace(t_span[0], t_span[1], 1000)  # 时间点
-
-# 初始条件：u(0) = 0
-u0 = [0]
-
-# 使用solve_ivp求解微分方程（包含一次项）
-solution_with_k1 = solve_ivp(
-    dudt, t_span, u0, method='RK45', t_eval=t_eval, args=(k1,)
-)
-
-# 求解忽略一次项的情况
-solution_without_k1 = solve_ivp(
-    dudt, t_span, u0, method='RK45', t_eval=t_eval, args=(0,)
-)
-
-# 计算速度 v = sqrt(u)
-v_with_k1 = np.sqrt(solution_with_k1.y[0])
-v_without_k1 = np.sqrt(solution_without_k1.y[0])
-
-# 计算理论末态速度
-def find_final_velocity(P, k1, k2):
-    # 定义方程：k1*v^2 + k2*v^3 - P = 0
-    def equation(v):
-        return k1 * v**2 + k2 * v**3 - P
+    @staticmethod
+    def constant_resistance(v, f0):
+        """常数阻力模型: f(v) = f0"""
+        return f0
     
-    # 使用数值方法求解
-    from scipy.optimize import fsolve
-    return fsolve(equation, 100)[0]
-
-v_final_with_k1 = find_final_velocity(P, k1, k2)
-v_final_without_k1 = find_final_velocity(P, 0, k2)
-
-print(f"包含一次项的末态速度: {v_final_with_k1:.2f} m/s")
-print(f"忽略一次项的末态速度: {v_final_without_k1:.2f} m/s")
-
-
-#--------------------------第五张图-----------------------------------------------
-
-
-
-# Physical parameters setup
-m = 150000  # Mass (kg) = 150 tons
-P = 2e7     # Power (W)
-k1 = 5.90e-4  # Linear resistance coefficient (kg/s)
-k2 = 5.86    # Quadratic resistance coefficient (kg/m)
-f0_maglev = 0  # Constant resistance for maglev train (N)
-f0_train = 4000  # Constant resistance for conventional train (N)
-
-# Define the differential equation
-def train_model(v, f0):
-    """Train motion differential equation"""
-    if v < 1e-6:  # Avoid division by zero
-        return (P - f0) / m
-    return (P/v - f0 - k1*v - k2*v**2) / m
-
-# 4th-order Runge-Kutta solver
-def runge_kutta4(f, v0, t_start, t_end, dt, f0):
-    """4th-order Runge-Kutta method for solving differential equations"""
-    num_steps = int((t_end - t_start) / dt)
-    t = np.zeros(num_steps)
-    v = np.zeros(num_steps)
+    @staticmethod
+    def linear_resistance(v, k1):
+        """线性阻力模型: f(v) = k1*v"""
+        return k1 * v
     
-    t[0] = t_start
-    v[0] = v0
+    @staticmethod
+    def quadratic_resistance(v, k2):
+        """二次阻力模型: f(v) = k2*v^2"""
+        return k2 * v**2
     
-    for i in range(num_steps - 1):
-        k1_val = dt * f(v[i], f0)
-        k2_val = dt * f(v[i] + k1_val/2, f0)
-        k3_val = dt * f(v[i] + k2_val/2, f0)
-        k4_val = dt * f(v[i] + k3_val, f0)
+    @staticmethod
+    def power_law_resistance(v, alpha, k):
+        """幂次阻力模型: f(v) = k*v^alpha"""
+        return k * v**alpha
+    
+    @staticmethod
+    def maglev_resistance(v, k1, k2):
+        """磁悬浮列车阻力模型: f(v) = k1*v + k2*v^2"""
+        return k1 * v + k2 * v**2
+    
+    @staticmethod
+    def conventional_resistance(v, f0, k1, k2):
+        """传统列车阻力模型: f(v) = f0 + k1*v + k2*v^2"""
+        return f0 + k1 * v + k2 * v**2
+
+
+class Solver:
+    """数值求解器类，包含龙格-库塔法和微分方程求解"""
+    
+    @staticmethod
+    def runge_kutta_4th(order, f, y0, t_span, dt, *args):
+        """
+        四阶龙格-库塔法求解常微分方程
         
-        v[i+1] = v[i] + (k1_val + 2*k2_val + 2*k3_val + k4_val)/6
-        t[i+1] = t[i] + dt
+        参数:
+            order: 微分方程阶数
+            f: 微分方程函数 dy/dt = f(t, y, *args)
+            y0: 初始条件 [y1(0), y2(0), ..., yn(0)]
+            t_span: 时间区间 (t_start, t_end)
+            dt: 时间步长
+            *args: 微分方程额外参数
         
-    return t, v
-
-# Calculate terminal velocity (steady-state solution)
-def terminal_velocity(f0, P, k1, k2):
-    """Calculate terminal velocity (when drag equals thrust)"""
-    def equation(v):
-        return f0*v + k1*v**2 + k2*v**3 - P
+        返回:
+            t: 时间数组
+            y: 解数组 [y1(t), y2(t), ..., yn(t)]
+        """
+        t_start, t_end = t_span
+        num_steps = int((t_end - t_start) / dt)
+        t = np.zeros(num_steps)
+        y = np.zeros((order, num_steps))
+        
+        t[0] = t_start
+        y[:, 0] = y0
+        
+        for i in range(num_steps - 1):
+            k1 = dt * f(t[i], y[:, i], *args)
+            k2 = dt * f(t[i] + dt/2, y[:, i] + k1/2, *args)
+            k3 = dt * f(t[i] + dt/2, y[:, i] + k2/2, *args)
+            k4 = dt * f(t[i] + dt, y[:, i] + k3, *args)
+            
+            y[:, i+1] = y[:, i] + (k1 + 2*k2 + 2*k3 + k4) / 6
+            t[i+1] = t[i] + dt
+            
+        return t, y
     
-    # Solve the cubic equation numerically
-    # Initial guess (approximation ignoring f0 and k1)
-    v_guess = (P / k2)**(1/3)
-    v_term = fsolve(equation, v_guess)[0]
-    return v_term
+    @staticmethod
+    def solve_ivp(f, t_span, y0, method='RK45', t_eval=None, *args):
+        """
+        封装scipy的solve_ivp函数求解初值问题
+        
+        参数:
+            f: 微分方程函数 dy/dt = f(t, y, *args)
+            t_span: 时间区间 (t_start, t_end)
+            y0: 初始条件
+            method: 求解方法，默认RK45
+            t_eval: 计算解的时间点
+            *args: 微分方程额外参数
+        
+        返回:
+            t: 时间数组
+            y: 解数组
+        """
+        from scipy.integrate import solve_ivp
+        solution = solve_ivp(f, t_span, y0, method=method, t_eval=t_eval, args=args)
+        return solution.t, solution.y
 
-# Calculate terminal velocities for both cases
-v_term_maglev = terminal_velocity(f0_maglev, P, k1, k2)
-v_term_train = terminal_velocity(f0_train, P, k1, k2)
 
-print(f"Maglev terminal velocity: {v_term_maglev:.2f} m/s ({v_term_maglev*3.6:.2f} km/h)")
-print(f"Conventional train terminal velocity: {v_term_train:.2f} m/s ({v_term_train*3.6:.2f} km/h)")
+class TerminalVelocity:
+    """末态速度计算类，包含不同阻力模型的末态速度求解"""
+    
+    @staticmethod
+    def constant_resistance(P, f0):
+        """常数阻力模型末态速度: v = P/f0"""
+        return P / f0
+    
+    @staticmethod
+    def linear_resistance(P, k1):
+        """线性阻力模型末态速度: v = sqrt(P/k1)"""
+        return np.sqrt(P / k1)
+    
+    @staticmethod
+    def power_law_resistance(P, alpha, k):
+        """幂次阻力模型末态速度: v = (P/k)^(1/(alpha+1))"""
+        return (P / k) **(1 / (alpha + 1))
+    
+    @staticmethod
+    def maglev_resistance(P, k1, k2):
+        """磁悬浮列车末态速度: 求解k1*v^2 + k2*v^3 = P"""
+        def equation(v):
+            return k1 * v**2 + k2 * v**3 - P
+        v_guess = (P / k2)**(1/3)  # 初始猜测值
+        return fsolve(equation, v_guess)[0]
+    
+    @staticmethod
+    def conventional_resistance(P, f0, k1, k2):
+        """传统列车末态速度: 求解f0*v + k1*v^2 + k2*v^3 = P"""
+        def equation(v):
+            return f0 * v + k1 * v**2 + k2 * v**3 - P
+        v_guess = (P / k2)**(1/3)  # 初始猜测值（忽略f0和k1）
+        return fsolve(equation, v_guess)[0]
 
-# Solve the differential equations numerically
-t_start = 0      # Start time (s)
-t_end = 1000     # End time (s)
-dt = 0.1         # Time step (s)
-v0 = 1e-19         # Initial velocity (m/s) - avoid division by zero
 
-# Solve for maglev train (f0=0)
-t_maglev, v_maglev = runge_kutta4(train_model, v0, t_start, t_end, dt, f0_maglev)
+class TrainDynamics:
+    """列车动力学模型类，整合阻力模型和求解器"""
+    
+    def __init__(self, mass, power):
+        """
+        初始化列车动力学模型
+        
+        参数:
+            mass: 列车质量(kg)
+            power: 功率(W)
+        """
+        self.mass = mass
+        self.power = power
+        self.resistance = ResistanceModels()
+        self.solver = Solver()
+        self.terminal_velocity = TerminalVelocity()
+    
+    def differential_equation(self, t, v, resistance_func, *resistance_args):
+        """
+        列车运动微分方程: m*v*dv/dt = P - f(v)*v
+        
+        参数:
+            t: 时间
+            v: 速度
+            resistance_func: 阻力函数
+            *resistance_args: 阻力函数参数
+            
+        返回:
+            dv/dt: 加速度
+        """
+        f_v = resistance_func(v, *resistance_args)
+        if v < 1e-10:  # 避免除以零
+            return self.power / self.mass
+        return (self.power / v - f_v) / self.mass
+    
+    def solve_constant_resistance(self, f0, t_span, dt=0.1):
+        """
+        求解常数阻力模型
+        
+        参数:
+            f0: 常数阻力(N)
+            t_span: 时间区间(t_start, t_end)
+            dt: 时间步长
+            
+        返回:
+            t: 时间数组
+            v: 速度数组
+            v_term: 末态速度
+        """
+        # 定义微分方程
+        def f(t, v):
+            return self.differential_equation(t, v, self.resistance.constant_resistance, f0)
+        
+        # 初始条件
+        v0 = 1e-15  # 避免除以零
+        
+        # 求解微分方程
+        t, v = self.solver.runge_kutta_4th(1, f, [v0], t_span, dt)
+        
+        # 计算末态速度
+        v_term = self.terminal_velocity.constant_resistance(self.power, f0)
+        
+        return t, v[0], v_term
+    
+    def solve_linear_resistance(self, k1, t_span, dt=0.1):
+        """
+        求解线性阻力模型
+        
+        参数:
+            k1: 线性阻力系数(kg/s)
+            t_span: 时间区间(t_start, t_end)
+            dt: 时间步长
+            
+        返回:
+            t: 时间数组
+            v: 速度数组
+            v_term: 末态速度
+        """
+        # 定义微分方程
+        def f(t, v):
+            return self.differential_equation(t, v, self.resistance.linear_resistance, k1)
+        
+        # 初始条件
+        v0 = 1e-15  # 避免除以零
+        
+        # 求解微分方程
+        t, v = self.solver.runge_kutta_4th(1, f, [v0], t_span, dt)
+        
+        # 计算末态速度
+        v_term = self.terminal_velocity.linear_resistance(self.power, k1)
+        
+        return t, v[0], v_term
+    
+    def solve_power_law_resistance(self, alpha, k, t_span, dt=0.1):
+        """
+        求解幂次阻力模型
+        
+        参数:
+            alpha: 幂次
+            k: 阻力系数
+            t_span: 时间区间(t_start, t_end)
+            dt: 时间步长
+            
+        返回:
+            t: 时间数组
+            v: 速度数组
+            v_term: 末态速度
+        """
+        # 定义微分方程
+        def f(t, v):
+            return self.differential_equation(t, v, self.resistance.power_law_resistance, alpha, k)
+        
+        # 初始条件
+        v0 = 1e-15  # 避免除以零
+        
+        # 求解微分方程
+        t, v = self.solver.runge_kutta_4th(1, f, [v0], t_span, dt)
+        
+        # 计算末态速度
+        v_term = self.terminal_velocity.power_law_resistance(self.power, alpha, k)
+        
+        return t, v[0], v_term
+    
+    def solve_maglev_resistance(self, k1, k2, t_span, dt=0.1):
+        """
+        求解磁悬浮列车阻力模型
+        
+        参数:
+            k1: 一次项系数(kg/s)
+            k2: 二次项系数(kg/m)
+            t_span: 时间区间(t_start, t_end)
+            dt: 时间步长
+            
+        返回:
+            t: 时间数组
+            v: 速度数组
+            v_term_with_k1: 包含一次项的末态速度
+            v_term_without_k1: 忽略一次项的末态速度
+        """
+        # 定义微分方程（包含一次项）
+        def f_with_k1(t, v):
+            return self.differential_equation(t, v, self.resistance.maglev_resistance, k1, k2)
+        
+        # 定义微分方程（忽略一次项）
+        def f_without_k1(t, v):
+            return self.differential_equation(t, v, self.resistance.quadratic_resistance, k2)
+        
+        # 初始条件
+        v0 = 1e-15  # 避免除以零
+        
+        # 求解微分方程（包含一次项）
+        t, v_with_k1 = self.solver.runge_kutta_4th(1, f_with_k1, [v0], t_span, dt)
+        
+        # 求解微分方程（忽略一次项）
+        _, v_without_k1 = self.solver.runge_kutta_4th(1, f_without_k1, [v0], t_span, dt)
+        
+        # 计算末态速度
+        v_term_with_k1 = self.terminal_velocity.maglev_resistance(self.power, k1, k2)
+        v_term_without_k1 = self.terminal_velocity.power_law_resistance(self.power, 2, k2)
+        
+        return t, v_with_k1[0], v_without_k1[0], v_term_with_k1, v_term_without_k1
+    
+    def solve_conventional_resistance(self, f0_maglev, f0_train, k1, k2, t_span, dt=0.1):
+        """
+        求解传统列车与磁悬浮列车阻力模型对比
+        
+        参数:
+            f0_maglev: 磁悬浮列车常数阻力(N)
+            f0_train: 传统列车常数阻力(N)
+            k1: 一次项系数(kg/s)
+            k2: 二次项系数(kg/m)
+            t_span: 时间区间(t_start, t_end)
+            dt: 时间步长
+            
+        返回:
+            t: 时间数组
+            v_maglev: 磁悬浮列车速度数组
+            v_train: 传统列车速度数组
+            v_term_maglev: 磁悬浮列车末态速度
+            v_term_train: 传统列车末态速度
+        """
+        # 定义磁悬浮列车微分方程(f0=0)
+        def f_maglev(t, v):
+            return self.differential_equation(t, v, self.resistance.maglev_resistance, k1, k2)
+        
+        # 定义传统列车微分方程(f0=4000)
+        def f_train(t, v):
+            return self.differential_equation(t, v, self.resistance.conventional_resistance, 
+                                             f0_train, k1, k2)
+        
+        # 初始条件
+        v0 = 1e-15  # 避免除以零
+        
+        # 求解磁悬浮列车微分方程
+        t, v_maglev = self.solver.runge_kutta_4th(1, f_maglev, [v0], t_span, dt)
+        
+        # 求解传统列车微分方程
+        _, v_train = self.solver.runge_kutta_4th(1, f_train, [v0], t_span, dt)
+        
+        # 计算末态速度
+        v_term_maglev = self.terminal_velocity.maglev_resistance(self.power, k1, k2)
+        v_term_train = self.terminal_velocity.conventional_resistance(self.power, f0_train, k1, k2)
+        
+        return t, v_maglev[0], v_train[0], v_term_maglev, v_term_train
 
-# Solve for conventional train (f0=4000)
-t_train, v_train = runge_kutta4(train_model, v0, t_start, t_end, dt, f0_train)
+
+# 示例用法
+if __name__ == "__main__":
+    # 创建列车动力学模型 (质量100kg, 功率1000W)
+    train = TrainDynamics(mass=100, power=1000)
+    
+    # 示例1: 常数阻力模型计算
+    print("=== 常数阻力模型计算 ===")
+    f0 = 50  # 常数阻力(N)
+    t_span = (0, 10)
+    t, v, v_term = train.solve_constant_resistance(f0, t_span)
+    print(f"■ 模型参数: 功率={train.power}W, 质量={train.mass}kg, 常数阻力={f0}N")
+    print(f"■ 末态速度: {v_term:.4f} m/s")
+    
+    # 示例2: 线性阻力模型计算
+    print("\n=== 线性阻力模型计算 ===")
+    k1 = 50  # 线性阻力系数(kg/s)
+    t_span = (0, 10)
+    t, v, v_term = train.solve_linear_resistance(k1, t_span)
+    print(f"■ 模型参数: 功率={train.power}W, 质量={train.mass}kg, 线性阻力系数={k1}kg/s")
+    print(f"■ 末态速度: {v_term:.4f} m/s")
